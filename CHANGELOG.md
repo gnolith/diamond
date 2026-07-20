@@ -5,6 +5,15 @@ Versioning after the first public release.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-20
+
+### Changed
+
+- Replaced the temporary npm release token with repository- and
+  environment-bound OIDC trusted publishing.
+- Disabled the dependency cache in release jobs so published builds start from
+  a clean dependency installation.
+
 ## [0.3.0] - 2026-07-20
 
 ### Changed
