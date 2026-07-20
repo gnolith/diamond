@@ -162,6 +162,33 @@ describe('SPARQL HTTP handler', () => {
     await expect(response.json()).resolves.toMatchObject({ boolean: true });
   });
 
+  it('rejects remote LOAD even on a writable endpoint', async () => {
+    const engine = {
+      query: vi.fn(() => {
+        throw new Error('LOAD must be rejected before engine execution');
+      }),
+    } as unknown as QueryEngine;
+    handle = createSparqlHandler({
+      db,
+      engine,
+      readOnly: false,
+      exposeErrors: true,
+    });
+    const response = await handle(
+      new Request('https://site.test/api/sparql', {
+        method: 'POST',
+        headers: { 'content-type': 'application/sparql-update' },
+        body: 'LOAD <https://untrusted.example/data.ttl>',
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: expect.stringContaining('LOAD is disabled'),
+    });
+    expect(engine.query).not.toHaveBeenCalled();
+  });
+
   it('rejects SERVICE clauses by default', async () => {
     const query = encodeURIComponent(
       'SELECT * WHERE { SERVICE <https://example.test/sparql> { ?s ?p ?o } }',

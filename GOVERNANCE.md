@@ -1,12 +1,13 @@
 # Governance
 
-The repository owner is the initial maintainer and release authority. Material
+The repository owner is the sole maintainer and release authority. Material
 decisions should be recorded in pull requests or architecture decision records.
 
-Maintainers may merge ordinary changes after required checks and review.
+The maintainer may merge ordinary changes after required checks. Independent
+review is welcome but is not required while the project has one maintainer.
 Storage migrations, security defaults, supported specifications, license,
-governance, and stable public API changes require approval from all active
-maintainers. Releases require a clean protected branch, passing release
+governance, and stable public API changes require an explicit rationale in the
+pull request. Releases require a clean protected branch, passing release
 workflow, changelog entry, generated artifact, and provenance evidence.
 
 A maintainer is considered inactive after six months without project activity

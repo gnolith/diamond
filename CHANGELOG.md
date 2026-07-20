@@ -5,6 +5,8 @@ Versioning after the first public release.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-19
+
 ### Added
 
 - D1-backed RDF/JS Source and Store baseline.
@@ -27,3 +29,5 @@ Versioning after the first public release.
 - Federation fetch reauthorization and redirect rejection to prevent allowed
   URLs from redirecting to unreviewed SSRF targets.
 - A source-factory extension boundary for future SQL-pushdown implementations.
+- Default rejection of remote SPARQL `LOAD`, including on writable endpoints.
+- Explicit experimental-release and sole-maintainer governance policies.

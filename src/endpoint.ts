@@ -179,6 +179,12 @@ export function createSparqlHandler(options: SparqlHandlerOptions) {
       if (operation === 'update' && !isUpdate) {
         throw new HttpError(400, 'SPARQL query requires the query operation');
       }
+      if (analysis.types.has('load')) {
+        throw new HttpError(
+          403,
+          'Remote SPARQL LOAD is disabled; import RDF through a trusted application path',
+        );
+      }
       if (analysis.types.has('service')) {
         await authorizeServices(
           analysis.serviceTargets,

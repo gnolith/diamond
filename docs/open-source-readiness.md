@@ -1,7 +1,8 @@
 # Open-source readiness
 
-This repository remains private and intentionally uses version `0.0.0` with
-`private: true`. Do not publish it until every open gate below is closed.
+This repository remains private and intentionally keeps `private: true` while
+the `0.1.0` release candidate is validated. Do not publish it until every open
+gate below is closed.
 
 ## Completed review
 
@@ -40,12 +41,14 @@ This repository remains private and intentionally uses version `0.0.0` with
       automatically when the repository becomes public.
 - [ ] Enable main-branch protection or a ruleset. GitHub currently returns 403
       for branch protection on this private repository/account plan.
-- [ ] Have a second developer follow the Codex Sites example from a fresh
-      project using `docs/integration-validation.md` and record any corrections.
-- [ ] Choose `0.1.0`, remove `private: true`, confirm npm ownership and package
-      trusted-publisher configuration. The provenance-bearing publish step is
-      already gated on public repository visibility.
-- [ ] Review the initial public issue/discussion policy and add a second
-      maintainer or explicitly accept the current bus-factor risk.
+- [ ] Have an independent, context-free validator follow the Codex Sites
+      example from a fresh project using `docs/integration-validation.md` and
+      record every correction. An independent agent is acceptable for the
+      experimental technical sign-off and must be labeled as such.
+- [ ] After clean-room sign-off, remove `private: true`, reconfirm npm ownership
+      of `sparql-d1`, and configure the package trusted publisher. The
+      provenance-bearing publish step is already gated on public visibility.
+- [x] Use GitHub Issues for public support and explicitly accept the sole-
+      maintainer bus-factor risk for the experimental `0.1.x` series.
 
 The remaining operational gates are not package correctness claims.

@@ -61,6 +61,12 @@ GET accepts only the `query` parameter. Updates require POST with either
 and update media types are not interchangeable, even when writable mode is
 enabled; ambiguous or disguised operations receive HTTP 400.
 
+Remote SPARQL `LOAD` receives HTTP 403 even when `readOnly: false`. `LOAD`
+would turn a writable endpoint into a server-side network fetch surface, so
+trusted RDF imports must use an application-controlled path. Local update
+forms such as `INSERT DATA`, `DELETE DATA`, and graph mutation remain available
+when writable mode is explicitly enabled.
+
 ### `allowServiceUrls(urls)`
 
 Builds an exact, canonical URL allowlist for `servicePolicy`. Dynamic
@@ -82,6 +88,10 @@ performed with fixed prepared SQL and canonical term keys.
 Extends the source with RDF/JS Store `import`, `remove`, `removeMatches`, and
 `deleteGraph`. A complete input stream is committed as one atomic JSON1-backed
 statement. The endpoint only constructs this Store when `readOnly: false`.
+
+For deployments offering both general reads and administrative writes, prefer
+separate read-only and authenticated writable handlers. `authenticate`
+protects the complete handler; authorization roles remain a host concern.
 
 ### Write helpers
 

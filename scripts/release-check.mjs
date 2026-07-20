@@ -57,6 +57,11 @@ for (const required of [
   'dist/endpoint.d.ts',
   'docs/api.md',
   'docs/threat-model.md',
+  'examples/codex-site/README.md',
+  'examples/codex-site/.openai/hosting.json',
+  'examples/codex-site/app/api/sparql/route.ts',
+  'examples/codex-site/app/api/sparql/admin/route.ts',
+  'examples/codex-site/drizzle/0000_rdf_quads.sql',
   'migrations/0001_rdf_quads.sql',
 ]) {
   assert.ok(files.has(required), `packed artifact is missing ${required}`);

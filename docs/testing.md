@@ -9,7 +9,7 @@ proof of the entire system.
 | RDF/JS source | Every one of the 16 quad-pattern binding masks                         |
 | Storage       | Strict schema, uniqueness, named/default graph behavior                |
 | Differential  | Identical Comunica queries over D1 and an N3 reference store           |
-| Protocol      | GET/POST, formats, auth, rate limit, cancellation, SERVICE policy      |
+| Protocol      | GET/POST, formats, auth, limits, cancellation, SERVICE/LOAD controls   |
 | Update        | Explicit opt-in, atomic stream completion, later read visibility       |
 | D1            | Miniflare/workerd binding, concurrent writes, batch rollback           |
 | Deployment    | Worker dry-run plus real Codex Sites HTTP and managed-D1 sequence      |

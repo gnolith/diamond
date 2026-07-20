@@ -28,4 +28,20 @@ describe('published integration assets', () => {
     expect(route).toContain('db: siteEnv.DB');
     expect(route).toContain('readOnly: true');
   });
+
+  it('keeps the optional writable route separate and fail-closed', () => {
+    const route = readFileSync(
+      'examples/codex-site/app/api/sparql/admin/route.ts',
+      'utf8',
+    );
+    expect(route).toContain('db: siteEnv.DB');
+    expect(route).toContain('SPARQL_ADMIN_TOKEN');
+    expect(route).toContain('readOnly: false');
+    expect(route).toContain('status: 503');
+  });
+
+  it('includes the complete Sites example in the packed package', () => {
+    const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(packageJson.files).toContain('examples');
+  });
 });

@@ -6,9 +6,16 @@ migration for its managed database. Install a packed private artifact as
 described in the repository README and configure `SPARQL_TOKEN` through Sites
 runtime values. Do not commit the token or place it in `.openai/hosting.json`.
 
-The example deliberately fails closed when no token is configured. A real site
-may replace the bearer check with its existing identity and authorization
-layer.
+The public-facing `/api/sparql` example is read-only and deliberately fails
+closed when no token is configured. A real site may replace the bearer check
+with its existing identity and authorization layer.
+
+An optional `/api/sparql/admin` example supports SPARQL Update for controlled
+validation and administration. It uses a distinct `SPARQL_ADMIN_TOKEN`, fails
+closed when that token is absent, and should be removed after validation unless
+the deployment requires an administrative endpoint. Never expose it without
+strong administrator authentication. Remote `LOAD` remains disabled on both
+routes; import trusted RDF through an application-controlled path.
 
 The complete clean-project validation and sign-off checklist is in
 `docs/integration-validation.md` at the repository root.

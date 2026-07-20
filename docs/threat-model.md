@@ -19,6 +19,7 @@ are untrusted. The D1 binding and package configuration are trusted host inputs.
 | Unauthorized reads      | Host-provided authentication hook                        |
 | Unauthorized writes     | Read-only endpoint; Update requires opt-in               |
 | SSRF through federation | `SERVICE` requires a per-target URL policy               |
+| SSRF through RDF import | Remote SPARQL `LOAD` is rejected at the HTTP boundary    |
 | Query explosion         | Query bytes, algebra depth/operation, and timeout limits |
 | Oversized output        | Bounded serialized stream and cancellation               |
 | SQL injection           | Fixed SQL structure and bound term keys                  |
@@ -44,3 +45,8 @@ state-changing surface that link traversal or prefetching could invoke. Each
 complete RDF/JS write stream is one atomic D1 statement; D1 does not expose a
 transaction spanning arbitrary Comunica callbacks, so hosts should not present
 multi-operation requests as a broader ACID transaction guarantee.
+
+Remote `LOAD` is rejected even in writable mode because it combines mutation
+with an attacker-selected server-side fetch. Applications may import trusted
+RDF outside the SPARQL HTTP endpoint after applying their own origin, size,
+content-type, redirect, and authorization controls.

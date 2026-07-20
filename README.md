@@ -5,8 +5,9 @@ Cloudflare D1. It is designed for Cloudflare Workers and Codex Sites projects
 that need a standards-based RDF query surface without operating a separate
 triplestore.
 
-> Status: private pre-release. The API, schema, and package name may change
-> before the first public release.
+> Status: private `0.1.0` release candidate. The first public release is
+> experimental: SPARQL/RDF correctness is extensively tested, while the
+> TypeScript API and physical D1 schema may change before 1.0.
 
 ## What it provides
 
@@ -15,8 +16,8 @@ triplestore.
 - A D1-backed RDF/JS `Source` with all 16 bound/unbound quad-pattern shapes.
 - An opt-in RDF/JS `Store` with atomic insert/delete streams for SPARQL Update.
 - A Worker-compatible SPARQL HTTP handler with result content negotiation.
-- Secure defaults: read-only operation, disabled `SERVICE`, bounded query
-  shape, timeout, and serialized-result limits.
+- Secure defaults: read-only operation, disabled `SERVICE` and remote `LOAD`,
+  bounded query shape, timeout, and serialized-result limits.
 - Authentication and observability hooks without prescribing an identity or
   telemetry vendor.
 - Differential tests against an in-memory RDF source and integration tests
@@ -33,7 +34,7 @@ tarball from an authorized clean clone:
 npm ci
 npm pack
 # Then, from the Sites project:
-npm install ./vendor/sparql-d1-0.0.0.tgz
+npm install ./vendor/sparql-d1-0.1.0.tgz
 ```
 
 Do not install the Git repository directly: generated `dist` files are not
@@ -76,7 +77,15 @@ export const POST = handle;
 Read-only mode and `SERVICE` rejection are enabled by default. Set
 `readOnly: false` only for an authenticated administrative endpoint. Federation
 requires a `servicePolicy`; use `allowServiceUrls()` for a strict static
-allowlist.
+allowlist. Remote SPARQL `LOAD` is not supported by the HTTP handler, including
+on writable endpoints; import trusted RDF through an application-controlled
+path instead.
+
+For mixed access, expose separate handlers: keep `/api/sparql` read-only and
+put a `readOnly: false` handler behind stronger administrator authentication at
+a separate route such as `/api/sparql/admin`. The authentication hook protects
+one complete handler; the package intentionally does not invent an identity or
+role system for the host application.
 
 ## Use as an RDF/JS source
 
@@ -95,9 +104,10 @@ const bindings = await engine.queryBindings(
 ## Security
 
 The package prevents SPARQL Update and federated `SERVICE` execution unless
-explicitly enabled. It does not authenticate callers or impose a distributed
-rate limit automatically; those controls depend on the host application and
-must be supplied through the authentication hook and deployment platform.
+explicitly enabled, and rejects remote `LOAD` even in writable mode. It does
+not authenticate callers or impose a distributed rate limit automatically;
+those controls depend on the host application and must be supplied through the
+authentication hook and deployment platform.
 
 See [SECURITY.md](SECURITY.md) and [docs/threat-model.md](docs/threat-model.md)
 before exposing an endpoint publicly.
@@ -140,6 +150,8 @@ be split deliberately by the host application.
   from arbitrary relational application tables.
 - Entailment regimes and the Graph Store HTTP Protocol are out of scope for the
   initial release.
+- Remote SPARQL `LOAD` is intentionally unavailable at the HTTP boundary to
+  prevent writable endpoints from becoming unrestricted server-side fetchers.
 - The full Comunica engine produces a roughly 6.1 MB uncompressed Worker bundle
   (about 990 KB gzip in the current dry run).
   The package imports its static engine entry point directly so Components.js
