@@ -18,7 +18,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-          cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: npm run check
@@ -38,10 +37,6 @@ jobs:
             SHA256SUMS
       - name: Publish to npm from the public repository
         if: ${{ github.event.repository.private == false }}
-        env:
-          # Temporary fallback until npm trusted publishing is configured.
-          # OIDC takes precedence after that publisher is active.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish ./*.tgz --access public --provenance
       - env:
           GH_TOKEN: ${{ github.token }}

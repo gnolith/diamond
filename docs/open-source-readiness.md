@@ -15,6 +15,8 @@ packed-verifier check on 2026-07-20.
   conformance, benchmarks, audit, license, secret, and CodeQL checks.
 - Pinned GitHub Actions, automated dependency updates, SBOMs, checksums,
   artifact attestations, and public-repository-only npm provenance publishing.
+- Repository- and release-environment-bound npm OIDC trusted publishing with no
+  long-lived token in the release workflow.
 - A fresh-project independent validation using only the packed public material,
   including real Codex Sites deployment and managed D1, followed by removal of
   temporary writable/schema routes, credentials, and RDF test data.
@@ -25,9 +27,6 @@ packed-verifier check on 2026-07-20.
 
 - Keep main-branch rules, vulnerability alerts, automated security fixes, and
   release workflows enabled as repository settings evolve.
-- Replace the temporary short-lived npm release token with npm trusted
-  publishing, then remove the fallback GitHub environment secret and workflow
-  fallback.
 - Continue to state the sole-maintainer bus-factor risk for the experimental
   `0.x` series and use GitHub Issues for public support.
 

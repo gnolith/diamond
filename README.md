@@ -10,7 +10,7 @@ separate triplestore.
 > Status: public experimental release. SPARQL/RDF correctness is extensively
 > tested, while the TypeScript API and physical D1 schema may change before
 > 1.0. See the [npm package](https://www.npmjs.com/package/@gnolith/diamond)
-> and [v0.3.0 release](https://github.com/gnolith/diamond/releases/tag/v0.3.0).
+> and [v0.3.1 release](https://github.com/gnolith/diamond/releases/tag/v0.3.1).
 
 ## What it provides
 
