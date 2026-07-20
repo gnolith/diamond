@@ -19,11 +19,13 @@ This repository remains private and intentionally uses version `0.0.0` with
 - GitHub vulnerability alerts and automated security fixes are enabled.
 - Repository text contains no local filesystem paths or private email
   addresses.
+- A packed artifact passed the query/update acceptance sequence in a private
+  Codex Site against its real managed D1 binding.
 
 ## Release gates
 
-- [ ] Authenticate Wrangler and pass the same end-to-end query/update suite
-      against a deployed Worker with a real remote D1 binding.
+- [x] Pass the end-to-end query/update suite in a deployed Codex Site with a
+      real managed D1 binding; evidence is in `docs/deployed-e2e.md`.
 - [ ] Resolve the GitHub-hosted runner `startup_failure` at the account or
       billing-policy level, then require green CI and Security workflows.
 - [ ] Enable main-branch protection or a ruleset. GitHub currently returns 403
@@ -35,6 +37,4 @@ This repository remains private and intentionally uses version `0.0.0` with
 - [ ] Review the initial public issue/discussion policy and add a second
       maintainer or explicitly accept the current bus-factor risk.
 
-The first three gates are operational controls, not package correctness claims.
-The repository must not advertise production deployment validation until the
-remote-D1 gate has actually run.
+The remaining operational gates are not package correctness claims.

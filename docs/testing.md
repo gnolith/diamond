@@ -9,10 +9,11 @@ proof of the entire system.
 | RDF/JS source | Every one of the 16 quad-pattern binding masks                      |
 | Storage       | Strict schema, uniqueness, named/default graph behavior             |
 | Differential  | Identical Comunica queries over D1 and an N3 reference store        |
-| Protocol      | GET, POST, formats, status codes, limits, auth, federation policy   |
+| Protocol      | GET/POST, formats, auth, rate limit, cancellation, SERVICE policy   |
 | Update        | Explicit opt-in, transaction completion, subsequent read visibility |
 | D1            | Miniflare/workerd binding, concurrent writes, batch rollback        |
-| Deployment    | Wrangler Worker dry-run bundle with `nodejs_compat`                 |
+| Deployment    | Worker dry-run plus real Codex Sites HTTP and managed-D1 sequence   |
+| Consumer      | Install the packed tarball and import both public entry points      |
 | Performance   | Deterministic dataset, p50/p95 latency, source-call count           |
 | Conformance   | 490/490 applicable W3C SPARQL 1.1 manifest cases                    |
 
@@ -23,4 +24,9 @@ coverage is not meaningful for them.
 The conformance job fetches the W3C-maintained manifest and records both a
 summary and an RDF EARL report as CI artifacts. Every excluded area and
 individual compatibility exception is listed in `docs/conformance.md` and
-encoded in the command line.
+encoded in the runner. The wrapper also asserts that exactly 490 results were
+produced; this prevents an upstream loading fault from becoming an empty green
+run.
+
+The dated deployed acceptance evidence and rerun command are recorded in
+`docs/deployed-e2e.md`.

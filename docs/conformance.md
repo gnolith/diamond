@@ -32,9 +32,10 @@ The eight harness-incompatible IDs are:
 - `property-path/manifest#pp35`
 - `subquery/manifest#subquery02`
 
-These exclusions are encoded literally in the npm command so a new skip cannot
-be introduced silently. Remove them when the upstream manifests or loader use
-one canonical graph IRI.
+These exclusions are encoded literally in the conformance runner so a new skip
+cannot be introduced silently. The runner also rejects an empty or partial
+result set. Remove the exclusions when the upstream manifests or loader use one
+canonical graph IRI.
 
 ## What this proves
 

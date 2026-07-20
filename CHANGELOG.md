@@ -12,3 +12,6 @@ Versioning after the first public release.
 - SPARQL Protocol endpoint with secure defaults and streaming serializers.
 - Unit, generated, differential, protocol, update, and workerd D1 tests.
 - Coverage, Worker bundle, package artifact, and benchmark gates.
+- Request cancellation, host rate-limit integration, and exact per-target
+  federation authorization.
+- W3C conformance/EARL reporting and install-from-tarball consumer validation.

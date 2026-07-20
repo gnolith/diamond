@@ -1,5 +1,6 @@
-import { QueryEngine } from '@comunica/query-sparql';
+import type { QueryEngine } from '@comunica/query-sparql/lib/QueryEngine.js';
 import type * as RDF from '@rdfjs/types';
+import { translate } from 'sparqlalgebrajs';
 import { D1QuadSource, D1QuadStore } from './d1-source.js';
 import type { QueryObservation } from './d1-source.js';
 import type { D1DatabaseLike } from './d1-types.js';
@@ -39,14 +40,22 @@ export interface SparqlRequestObservation {
   error?: string;
 }
 
+export type ServicePolicy = (
+  serviceIri: URL,
+  request: Request,
+) => boolean | Promise<boolean>;
+
 export interface SparqlHandlerOptions {
   db: D1DatabaseLike;
   engine?: QueryEngine;
   authenticate?: (
     request: Request,
   ) => boolean | Response | Promise<boolean | Response>;
+  rateLimit?: (
+    request: Request,
+  ) => Response | null | undefined | Promise<Response | null | undefined>;
   readOnly?: boolean;
-  allowService?: boolean;
+  servicePolicy?: ServicePolicy;
   maxQueryBytes?: number;
   maxResultBytes?: number;
   maxAlgebraDepth?: number;
@@ -75,13 +84,19 @@ class HttpError extends Error {
 }
 
 export function createSparqlHandler(options: SparqlHandlerOptions) {
-  const engine = options.engine ?? new QueryEngine();
+  let defaultEngine: Promise<QueryEngine> | undefined;
+  const getEngine = () => {
+    if (options.engine) {
+      return Promise.resolve(options.engine);
+    }
+    defaultEngine ??= loadDefaultEngine();
+    return defaultEngine;
+  };
   const readOnly = options.readOnly ?? true;
   const sourceOptions = options.observeD1 ? { observe: options.observeD1 } : {};
   const source = readOnly
     ? new D1QuadSource(options.db, sourceOptions)
     : new D1QuadStore(options.db, sourceOptions);
-  const allowService = options.allowService ?? false;
   const exposeErrors = options.exposeErrors ?? false;
   const limits: Limits = {
     maxQueryBytes: options.maxQueryBytes ?? 16 * 1024,
@@ -98,6 +113,11 @@ export function createSparqlHandler(options: SparqlHandlerOptions) {
     let mediaType: string | undefined;
 
     try {
+      const rateLimitResponse = await options.rateLimit?.(request);
+      if (rateLimitResponse instanceof Response) {
+        observe(options, started, queryBytes, rateLimitResponse.status);
+        return rateLimitResponse;
+      }
       const authResult = await options.authenticate?.(request);
       if (authResult instanceof Response) {
         observe(options, started, queryBytes, authResult.status);
@@ -117,11 +137,12 @@ export function createSparqlHandler(options: SparqlHandlerOptions) {
       }
 
       const context = { sources: [source], readOnly };
-      const explanation = await withTimeout(
-        engine.explain(query, { ...context }, 'parsed'),
+      const parsed = await withTimeout(
+        Promise.resolve().then(() => translate(query, { quads: true })),
         limits.timeoutMs,
+        request.signal,
       );
-      const analysis = analyzeAlgebra(explanation.data as unknown);
+      const analysis = analyzeAlgebra(parsed);
 
       if (analysis.operations > limits.maxAlgebraOperations) {
         throw new HttpError(422, 'SPARQL query contains too many operations');
@@ -129,8 +150,12 @@ export function createSparqlHandler(options: SparqlHandlerOptions) {
       if (analysis.depth > limits.maxAlgebraDepth) {
         throw new HttpError(422, 'SPARQL query is nested too deeply');
       }
-      if (!allowService && analysis.types.has('service')) {
-        throw new HttpError(403, 'Federated SERVICE clauses are disabled');
+      if (analysis.types.has('service')) {
+        await authorizeServices(
+          analysis.serviceTargets,
+          options.servicePolicy,
+          request,
+        );
       }
       if (
         readOnly &&
@@ -139,29 +164,41 @@ export function createSparqlHandler(options: SparqlHandlerOptions) {
         throw new HttpError(403, 'SPARQL Update is disabled');
       }
 
+      const engine = await getEngine();
       const deadline = performance.now() + limits.timeoutMs;
-      const result = await withDeadline(engine.query(query, context), deadline);
+      const queryContext = { ...context, httpAbortSignal: request.signal };
+      const result = await withDeadline(
+        engine.query(query, queryContext),
+        deadline,
+        request.signal,
+      );
       resultType = result.resultType;
 
       if (result.resultType === 'void') {
-        await withDeadline(result.execute(), deadline);
+        await withDeadline(result.execute(), deadline, request.signal);
         observe(options, started, queryBytes, 204, resultType);
         return new Response(null, { status: 204 });
       }
 
-      const available = await engine.getResultMediaTypes(context);
+      const available = await engine.getResultMediaTypes(queryContext);
       mediaType = negotiateMediaType(
         request.headers.get('accept'),
         result.resultType,
         new Set(Object.keys(available)),
       );
       const serialized = await withDeadline(
-        engine.resultToString(result as RDF.Query<unknown>, mediaType, context),
+        engine.resultToString(
+          result as RDF.Query<unknown>,
+          mediaType,
+          queryContext,
+        ),
         deadline,
+        request.signal,
       );
       const body = toWebStream(serialized.data, {
         deadline,
         maxBytes: limits.maxResultBytes,
+        signal: request.signal,
       });
       const response = new Response(body, {
         status: 200,
@@ -198,6 +235,14 @@ export function createSparqlHandler(options: SparqlHandlerOptions) {
       );
     }
   };
+}
+
+async function loadDefaultEngine(): Promise<QueryEngine> {
+  const runtime = globalThis as typeof globalThis & { __dirname?: string };
+  runtime.__dirname ??= '/';
+  const { QueryEngine: DefaultQueryEngine } =
+    await import('@comunica/query-sparql/lib/QueryEngine.js');
+  return new DefaultQueryEngine();
 }
 
 async function extractQuery(
@@ -253,8 +298,10 @@ function analyzeAlgebra(value: unknown): {
   depth: number;
   operations: number;
   types: Set<string>;
+  serviceTargets: Array<string | null>;
 } {
   const types = new Set<string>();
+  const serviceTargets: Array<string | null> = [];
   let operations = 0;
   let maximumDepth = 0;
 
@@ -274,12 +321,54 @@ function analyzeAlgebra(value: unknown): {
     ) {
       operations += 1;
       types.add(record.type);
+      if (record.type === 'service') {
+        const name = record.name as Record<string, unknown> | undefined;
+        serviceTargets.push(
+          name?.termType === 'NamedNode' && typeof name.value === 'string'
+            ? name.value
+            : null,
+        );
+      }
     }
     Object.values(record).forEach((item) => visit(item, depth + 1));
   };
 
   visit(value, 1);
-  return { depth: maximumDepth, operations, types };
+  return { depth: maximumDepth, operations, types, serviceTargets };
+}
+
+async function authorizeServices(
+  targets: ReadonlyArray<string | null>,
+  policy: ServicePolicy | undefined,
+  request: Request,
+): Promise<void> {
+  if (!policy || !targets.length) {
+    throw new HttpError(403, 'Federated SERVICE clauses are disabled');
+  }
+  for (const target of targets) {
+    let url: URL;
+    try {
+      if (!target) {
+        throw new Error('Dynamic SERVICE target');
+      }
+      url = new URL(target);
+    } catch {
+      throw new HttpError(403, 'Dynamic SERVICE targets are not allowed');
+    }
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      !(await policy(url, request))
+    ) {
+      throw new HttpError(403, 'Federated SERVICE target is not allowed');
+    }
+  }
+}
+
+export function allowServiceUrls(urls: Iterable<string | URL>): ServicePolicy {
+  const allowed = new Set([...urls].map((url) => new URL(url).href));
+  return (serviceIri) => allowed.has(serviceIri.href);
 }
 
 function negotiateMediaType(
@@ -335,7 +424,7 @@ function parseAccept(
 
 function toWebStream(
   data: NodeJS.ReadableStream,
-  limits: { deadline: number; maxBytes: number },
+  limits: { deadline: number; maxBytes: number; signal: AbortSignal },
 ): ReadableStream<Uint8Array> {
   const iterable = data as NodeJS.ReadableStream & AsyncIterable<unknown>;
   const iterator = iterable[Symbol.asyncIterator]();
@@ -345,7 +434,11 @@ function toWebStream(
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
-        const next = await withDeadline(iterator.next(), limits.deadline);
+        const next = await withDeadline(
+          iterator.next(),
+          limits.deadline,
+          limits.signal,
+        );
         if (next.done) {
           controller.close();
           return;
@@ -375,25 +468,49 @@ function toWebStream(
   });
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return withDeadline(promise, performance.now() + timeoutMs);
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<T> {
+  return withDeadline(promise, performance.now() + timeoutMs, signal);
 }
 
-function withDeadline<T>(promise: Promise<T>, deadline: number): Promise<T> {
+function withDeadline<T>(
+  promise: Promise<T>,
+  deadline: number,
+  signal?: AbortSignal,
+): Promise<T> {
   const remaining = deadline - performance.now();
   if (remaining <= 0) {
     return Promise.reject(new HttpError(504, 'SPARQL query timed out'));
   }
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      const timer = setTimeout(
-        () => reject(new HttpError(504, 'SPARQL query timed out')),
-        remaining,
-      );
-      timer.unref?.();
-    }),
-  ]);
+  if (signal?.aborted) {
+    return Promise.reject(new HttpError(499, 'SPARQL request was cancelled'));
+  }
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => signal?.removeEventListener('abort', onAbort);
+    const settle = (operation: () => void) => {
+      clearTimeout(timer);
+      cleanup();
+      operation();
+    };
+    const onAbort = () =>
+      settle(() => reject(new HttpError(499, 'SPARQL request was cancelled')));
+    const timer = setTimeout(
+      () => settle(() => reject(new HttpError(504, 'SPARQL query timed out'))),
+      remaining,
+    );
+    timer.unref?.();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => settle(() => resolve(value)),
+      (error) => settle(() => reject(error)),
+    );
+    if (signal?.aborted) {
+      onAbort();
+    }
+  });
 }
 
 function normalizeError(error: unknown): HttpError {

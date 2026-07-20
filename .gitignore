@@ -7,5 +7,6 @@ node_modules/
 !.env.example
 .wrangler/
 .rdf-test-suite-cache*
+.rdf-test-cache/
 conformance-earl.ttl
 conformance/*.ttl

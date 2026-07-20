@@ -65,11 +65,12 @@ let queryEngine;
 async function modules() {
   modulesPromise ??= Promise.all([
     import('../dist/index.js'),
-    import('@comunica/query-sparql'),
+    import('@comunica/query-sparql/lib/QueryEngine.js'),
+    import('sparqlalgebrajs'),
   ]);
-  const [adapter, comunica] = await modulesPromise;
+  const [adapter, comunica, algebra] = await modulesPromise;
   queryEngine ??= new comunica.QueryEngine();
-  return { ...adapter, ...comunica, queryEngine };
+  return { ...adapter, ...comunica, ...algebra, queryEngine };
 }
 
 async function createStore(data) {
@@ -114,9 +115,8 @@ function context(source, options) {
 }
 
 exports.parse = async (queryString, options) => {
-  const { queryEngine } = await modules();
-  const { source } = await createStore([]);
-  await queryEngine.explain(queryString, context(source, options), 'parsed');
+  const { translate } = await modules();
+  translate(queryString, { baseIRI: options.baseIRI, quads: true });
 };
 
 exports.query = async (data, queryString, options) => {

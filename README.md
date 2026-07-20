@@ -67,7 +67,9 @@ export const POST = handle;
 ```
 
 Read-only mode and `SERVICE` rejection are enabled by default. Set
-`readOnly: false` only for an authenticated administrative endpoint.
+`readOnly: false` only for an authenticated administrative endpoint. Federation
+requires a `servicePolicy`; use `allowServiceUrls()` for a strict static
+allowlist.
 
 ## Use as an RDF/JS source
 
@@ -93,6 +95,9 @@ must be supplied through the authentication hook and deployment platform.
 See [SECURITY.md](SECURITY.md) and [docs/threat-model.md](docs/threat-model.md)
 before exposing an endpoint publicly.
 
+See [docs/api.md](docs/api.md) for every export, option, default, and runtime
+behavior.
+
 ## Development
 
 ```sh
@@ -105,6 +110,9 @@ npm run benchmark
 `npm run check` formats, lints, type-checks, executes coverage and D1
 integration tests, builds the package, bundles a Cloudflare Worker, and
 inspects the npm artifact.
+
+The production Codex Sites and D1 acceptance record, including a reusable
+probe, is in [docs/deployed-e2e.md](docs/deployed-e2e.md).
 
 RDF writes use a single JSON-backed SQLite statement, keeping an update atomic
 and avoiding one D1 subrequest per quad. A single atomic payload is capped at
@@ -121,9 +129,10 @@ be split deliberately by the host application.
   from arbitrary relational application tables.
 - Entailment regimes and the Graph Store HTTP Protocol are out of scope for the
   initial release.
-- The full Comunica engine produces a roughly 5.8 MB uncompressed Worker bundle
-  in the current dry run. Deployment plan and startup/CPU budgets must be
-  checked against the target account before a public availability promise.
+- The full Comunica engine produces a roughly 6.1 MB uncompressed Worker bundle
+  (about 990 KB gzip in the current dry run).
+  The package imports its static engine entry point directly so Components.js
+  filesystem configuration is not evaluated in Workers.
 
 The current private-to-public release gates are tracked in
 [docs/open-source-readiness.md](docs/open-source-readiness.md).

@@ -14,3 +14,9 @@ export type { D1QuadSourceOptions, QueryObservation } from './d1-source.js';
 export { initializeStore, schemaStatements } from './schema.js';
 export { decodeTerm, encodeTerm } from './term-codec.js';
 export type { StoredTerm } from './term-codec.js';
+export { allowServiceUrls, createSparqlHandler } from './endpoint.js';
+export type {
+  ServicePolicy,
+  SparqlHandlerOptions,
+  SparqlRequestObservation,
+} from './endpoint.js';

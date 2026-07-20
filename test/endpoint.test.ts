@@ -1,7 +1,7 @@
 import { DataFactory } from 'rdf-data-factory';
-import type { QueryEngine } from '@comunica/query-sparql';
+import type { QueryEngine } from '@comunica/query-sparql/lib/QueryEngine.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createSparqlHandler } from '../src/endpoint.js';
+import { allowServiceUrls, createSparqlHandler } from '../src/endpoint.js';
 import { D1QuadSource, insertQuads } from '../src/d1-source.js';
 import { initializeStore } from '../src/schema.js';
 import { MemoryD1 } from './memory-d1.js';
@@ -110,6 +110,50 @@ describe('SPARQL HTTP handler', () => {
     expect(response.status).toBe(403);
   });
 
+  it('requires every static SERVICE target to pass an explicit policy', async () => {
+    let inspected: URL | undefined;
+    handle = createSparqlHandler({
+      db,
+      servicePolicy(serviceIri) {
+        inspected = serviceIri;
+        return false;
+      },
+    });
+    const query = encodeURIComponent(
+      'SELECT * WHERE { SERVICE <https://blocked.example/sparql> { ?s ?p ?o } }',
+    );
+    const response = await handle(
+      new Request(`https://site.test/api/sparql?query=${query}`),
+    );
+    expect(response.status).toBe(403);
+    expect(inspected?.href).toBe('https://blocked.example/sparql');
+  });
+
+  it('rejects dynamic SERVICE targets that cannot be authorized statically', async () => {
+    const query = encodeURIComponent(
+      'SELECT * WHERE { SERVICE ?endpoint { ?s ?p ?o } }',
+    );
+    handle = createSparqlHandler({ db, servicePolicy: () => true });
+    const response = await handle(
+      new Request(`https://site.test/api/sparql?query=${query}`),
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it('builds exact canonical SERVICE URL allowlists', async () => {
+    const policy = allowServiceUrls(['https://allowed.example/sparql']);
+    const request = new Request('https://site.test/api/sparql');
+    expect(
+      await policy(new URL('https://allowed.example/sparql'), request),
+    ).toBe(true);
+    expect(
+      await policy(new URL('https://allowed.example/sparql/extra'), request),
+    ).toBe(false);
+    expect(
+      await policy(new URL('https://allowed.example.evil/sparql'), request),
+    ).toBe(false);
+  });
+
   it('enforces authentication hooks', async () => {
     handle = createSparqlHandler({ db, authenticate: () => false });
     const response = await handle(
@@ -121,13 +165,35 @@ describe('SPARQL HTTP handler', () => {
   it('allows authentication hooks to return a complete response', async () => {
     handle = createSparqlHandler({
       db,
-      authenticate: () => new Response('rate limited', { status: 429 }),
+      authenticate: () => new Response('identity unavailable', { status: 503 }),
     });
     const response = await handle(
       new Request('https://site.test/api/sparql?query=ASK%20%7B%7D'),
     );
+    expect(response.status).toBe(503);
+    await expect(response.text()).resolves.toBe('identity unavailable');
+  });
+
+  it('enforces host-provided rate limits before query parsing', async () => {
+    let authenticated = false;
+    handle = createSparqlHandler({
+      db,
+      rateLimit: () =>
+        new Response('rate limited', {
+          status: 429,
+          headers: { 'retry-after': '60' },
+        }),
+      authenticate: () => {
+        authenticated = true;
+        return true;
+      },
+    });
+    const response = await handle(
+      new Request('https://site.test/api/sparql?query=not-even-sparql'),
+    );
     expect(response.status).toBe(429);
-    await expect(response.text()).resolves.toBe('rate limited');
+    expect(response.headers.get('retry-after')).toBe('60');
+    expect(authenticated).toBe(false);
   });
 
   it('enforces query-size limits', async () => {
@@ -237,7 +303,7 @@ describe('SPARQL HTTP handler', () => {
 
   it('times out stalled engine work and redacts unexpected errors', async () => {
     const stalled = {
-      explain: () => new Promise(() => undefined),
+      query: () => new Promise(() => undefined),
     } as unknown as QueryEngine;
     handle = createSparqlHandler({ db, engine: stalled, timeoutMs: 1 });
     expect(
@@ -249,7 +315,7 @@ describe('SPARQL HTTP handler', () => {
     ).toBe(504);
 
     const broken = {
-      explain: async () => {
+      query: async () => {
         throw new Error('sensitive database detail');
       },
     } as unknown as QueryEngine;
@@ -261,6 +327,21 @@ describe('SPARQL HTTP handler', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'SPARQL query execution failed',
     });
+  });
+
+  it('terminates work when the client request is cancelled', async () => {
+    const stalled = {
+      query: () => new Promise(() => undefined),
+    } as unknown as QueryEngine;
+    const controller = new AbortController();
+    handle = createSparqlHandler({ db, engine: stalled });
+    const responsePromise = handle(
+      new Request('https://site.test/api/sparql?query=ASK%20%7B%7D', {
+        signal: controller.signal,
+      }),
+    );
+    controller.abort();
+    await expect(responsePromise).resolves.toMatchObject({ status: 499 });
   });
 
   it('reports request observations', async () => {

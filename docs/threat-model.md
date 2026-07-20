@@ -18,7 +18,7 @@ are untrusted. The D1 binding and package configuration are trusted host inputs.
 | ----------------------- | -------------------------------------------------------- |
 | Unauthorized reads      | Host-provided authentication hook                        |
 | Unauthorized writes     | Read-only endpoint; Update requires opt-in               |
-| SSRF through federation | `SERVICE` rejected unless explicitly enabled             |
+| SSRF through federation | `SERVICE` requires a per-target URL policy               |
 | Query explosion         | Query bytes, algebra depth/operation, and timeout limits |
 | Oversized output        | Bounded serialized stream and cancellation               |
 | SQL injection           | Fixed SQL structure and bound term keys                  |
@@ -31,5 +31,6 @@ are untrusted. The D1 binding and package configuration are trusted host inputs.
 Algebra size is only a proxy for execution cost. Small property-path or join
 queries can still be expensive. Public deployments should add platform rate
 limits, per-principal authorization, logging, and conservative Worker limits.
-Enabling `SERVICE` requires a destination allowlist and a fetch policy; the
-boolean opt-in alone is not sufficient for an untrusted public endpoint.
+Enabling `SERVICE` requires a destination policy. The supplied
+`allowServiceUrls()` helper performs exact canonical matching; dynamic targets,
+embedded credentials, and non-HTTP(S) schemes are rejected independently.
