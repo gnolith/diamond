@@ -11,7 +11,13 @@ export {
   insertQuads,
 } from './d1-source.js';
 export type { D1QuadSourceOptions, QueryObservation } from './d1-source.js';
-export { initializeStore, schemaStatements } from './schema.js';
+export {
+  expectedStoreIndexes,
+  initializeStore,
+  inspectStoreSchema,
+  schemaStatements,
+} from './schema.js';
+export type { StoreSchemaInspection } from './schema.js';
 export { decodeTerm, encodeTerm } from './term-codec.js';
 export type { StoredTerm } from './term-codec.js';
 export { allowServiceUrls, createSparqlHandler } from './endpoint.js';

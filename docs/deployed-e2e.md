@@ -1,5 +1,25 @@
 # Deployed Codex Sites validation
 
+## Clean-room release gate
+
+An independent clean-room run of the first `0.1.0` candidate (commit
+`c64e32b`, SHA-256
+`8AFB2C7E25FD1AA6FDBBE29C6F19588A849B10411C52AA10AB8544A4EFDED95B`)
+failed on 2026-07-19. Production Worker ASK-to-XML serialization returned HTTP
+500, and the deployed probe script was absent from the archive. That artifact
+must not be released. The repository now has bundled-Worker ASK/SELECT XML
+regressions and artifact-presence checks; an independent clean-room rerun of a
+new archive remains required before release.
+
+A second independent run of commit `4a0e008` and SHA-256
+`AAB0C9027B0F9F2BFD055D3C44AA2CF26509A647031AFE891F266F37E3045A4E`
+passed every production behavior check but failed sign-off because the packed
+procedure required managed-D1 catalog proof without providing a diagnostic
+route or command. The package now includes both; another independent run is
+required.
+
+## Earlier private integration proof
+
 On 2026-07-19, package commit `34b790c` was installed from its packed artifact
 into an owner-only Codex Site and exercised against that site's managed D1 binding at
 <https://sparql-d1-e2e-probe.kcsfelty.chatgpt.site/api/sparql>.
@@ -42,13 +62,54 @@ service-level guarantees. Worker logs did not expose heap or D1 `rows_read`;
 the deterministic local benchmark reports heap, D1 calls, returned rows, and
 latency separately.
 
-Run the same destructive-but-self-cleaning probe against an authorized test
-endpoint with:
+Run the destructive-but-self-cleaning probe from an installed package against
+an authorized test endpoint with:
 
 ```sh
 SPARQL_ENDPOINT=https://example.test/api/sparql npm run test:deployed
 ```
 
+To prove the packed command is executable rather than accidentally using a
+source checkout, a consumer can run it with `npm explore sparql-d1 -- npm run
+test:deployed` while supplying the same environment variables.
+
 For an authenticated endpoint, also set `SPARQL_AUTH_HEADER` and
-`SPARQL_AUTH_TOKEN`. The script generates a unique graph and attempts cleanup
-in `finally`. Do not point it at a read-only or production-data endpoint.
+`SPARQL_AUTH_TOKEN`. An owner-only Site has a separate outer access gate. For
+an identity-less automated probe, obtain a short-lived Sites test-bypass token
+through the Sites deployment tooling and set both
+`SPARQL_OUTER_AUTH_HEADER=OAI-Sites-Authorization` and
+`SPARQL_OUTER_AUTH_TOKEN`. Never put either token in source or command output.
+The script sends both bearer headers, checks SPARQL Results XML in addition to
+the mutation/read/security sequence, generates a unique graph, and attempts
+cleanup in `finally`. Do not point it at a read-only or production-data
+endpoint.
+
+### Managed D1 catalog verification
+
+Temporarily mount the packed `examples/codex-site/app/api/sparql/schema/route.ts`
+and configure `SPARQL_ADMIN_TOKEN`. Then run the installed verifier with the
+schema endpoint and the same two authentication layers:
+
+```sh
+SPARQL_SCHEMA_ENDPOINT=https://example.test/api/sparql/schema \
+SPARQL_AUTH_HEADER=Authorization \
+SPARQL_AUTH_TOKEN=admin-token \
+SPARQL_OUTER_AUTH_HEADER=OAI-Sites-Authorization \
+SPARQL_OUTER_AUTH_TOKEN=sites-bypass-token \
+npm explore sparql-d1 -- npm run test:deployed:schema
+```
+
+PowerShell users can set the same values without POSIX inline assignment:
+
+```powershell
+$env:SPARQL_SCHEMA_ENDPOINT='https://example.test/api/sparql/schema'
+$env:SPARQL_AUTH_HEADER='Authorization'
+$env:SPARQL_AUTH_TOKEN='<admin token>'
+$env:SPARQL_OUTER_AUTH_HEADER='OAI-Sites-Authorization'
+$env:SPARQL_OUTER_AUTH_TOKEN='<Sites bypass token>'
+npm explore sparql-d1 -- npm run test:deployed:schema
+```
+
+The verifier fails unless the deployed catalog contains a STRICT `rdf_quads`
+table and all four expected covering indexes in exact column order. Remove the
+temporary schema route, admin route, and administrator token afterward.

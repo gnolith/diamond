@@ -6,6 +6,12 @@ migration for its managed database. Install a packed private artifact as
 described in the repository README and configure `SPARQL_TOKEN` through Sites
 runtime values. Do not commit the token or place it in `.openai/hosting.json`.
 
+Deployment applies the copied Drizzle migration to managed D1. A fresh local
+`vinext dev` D1 is not initialized by copying the file alone; unless the Sites
+starter documents a local migration command, perform the first functional D1
+check after an owner-only deployment. The package's Miniflare suite applies and
+tests this schema locally under workerd.
+
 The public-facing `/api/sparql` example is read-only and deliberately fails
 closed when no token is configured. A real site may replace the bearer check
 with its existing identity and authorization layer.
@@ -16,6 +22,13 @@ closed when that token is absent, and should be removed after validation unless
 the deployment requires an administrative endpoint. Never expose it without
 strong administrator authentication. Remote `LOAD` remains disabled on both
 routes; import trusted RDF through an application-controlled path.
+
+The optional `/api/sparql/schema` example is a narrow, read-only validation
+route protected by the same administrator token. It returns only the
+`rdf_quads` table definition and expected index layout through the package's
+`inspectStoreSchema` helper. Use the packed `npm run test:deployed:schema`
+command to verify managed D1, then remove this route with the writable route
+and administrator secret.
 
 The complete clean-project validation and sign-off checklist is in
 `docs/integration-validation.md` at the repository root.
