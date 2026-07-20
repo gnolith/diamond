@@ -1,0 +1,64 @@
+{
+  "name": "sparql-d1",
+  "version": "0.0.0",
+  "description": "A Comunica-compatible RDF/JS source backed by Cloudflare D1.",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./endpoint": {
+      "types": "./dist/endpoint.d.ts",
+      "import": "./dist/endpoint.js"
+    }
+  },
+  "files": [
+    "dist",
+    "migrations",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run worker:check && npm run pack:check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "pack:check": "npm pack --dry-run",
+    "benchmark": "tsx benchmark/run.ts",
+    "worker:check": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@comunica/query-sparql": "^5.3.0",
+    "@rdfjs/types": "^2.0.1",
+    "asynciterator": "^3.10.0",
+    "rdf-data-factory": "^2.0.2"
+  },
+  "devDependencies": {
+    "@comunica/query-sparql-rdfjs-lite": "^5.3.0",
+    "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/n3": "^1.26.1",
+    "@vitest/coverage-v8": "^3.2.4",
+    "better-sqlite3": "^12.2.0",
+    "eslint": "^10.7.0",
+    "fast-check": "^4.3.0",
+    "miniflare": "^4.20260714.0",
+    "n3": "^1.26.0",
+    "prettier": "^3.9.5",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.64.0",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.112.0"
+  },
+  "license": "MIT"
+}
