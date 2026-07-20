@@ -125,6 +125,9 @@ be split deliberately by the host application.
   in the current dry run. Deployment plan and startup/CPU budgets must be
   checked against the target account before a public availability promise.
 
+The current private-to-public release gates are tracked in
+[docs/open-source-readiness.md](docs/open-source-readiness.md).
+
 ## License
 
 MIT
