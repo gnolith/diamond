@@ -49,3 +49,16 @@ jobs:
         with:
           languages: javascript-typescript
       - uses: github/codeql-action/analyze@ddf5ce7296213f5548c91e2dd19df2d77d2b2d66 # v3
+        with:
+          output: codeql-results
+          upload: ${{ github.event.repository.private && 'never' || 'always' }}
+      - name: Verify private-repository CodeQL results
+        if: github.event.repository.private
+        run: node scripts/check-codeql-sarif.mjs codeql-results
+      - name: Preserve CodeQL SARIF
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codeql-sarif
+          path: codeql-results
+          if-no-files-found: error

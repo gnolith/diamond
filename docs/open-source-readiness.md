@@ -31,7 +31,10 @@ This repository remains private and intentionally uses version `0.0.0` with
 - [x] Pass the end-to-end query/update suite in a deployed Codex Site with a
       real managed D1 binding; evidence is in `docs/deployed-e2e.md`.
 - [ ] Resolve the GitHub-hosted runner `startup_failure` at the account or
-      billing-policy level, then require green CI and Security workflows.
+      billing-policy level, then require green CI and Security workflows. While
+      private code scanning is unavailable, CI retains CodeQL SARIF as an
+      artifact and fails if it contains findings; publication switches on
+      automatically when the repository becomes public.
 - [ ] Enable main-branch protection or a ruleset. GitHub currently returns 403
       for branch protection on this private repository/account plan.
 - [ ] Have a second developer follow the Codex Sites example from a fresh
