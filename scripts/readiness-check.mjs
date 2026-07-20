@@ -34,6 +34,7 @@ const requiredFiles = [
   'docs/threat-model.md',
   'examples/codex-site/app/api/sparql/route.ts',
   'examples/codex-site/app/api/sparql/admin/route.ts',
+  'examples/codex-site/app/api/sparql/schema/route.ts',
   'examples/codex-site/drizzle/0000_rdf_quads.sql',
   'migrations/0001_rdf_quads.sql',
 ];

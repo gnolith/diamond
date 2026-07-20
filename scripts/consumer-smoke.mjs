@@ -68,7 +68,11 @@ if (
 ) {
   throw new Error('Packed metadata differs from the source package');
 }
-for (const path of ['scripts/deployed-e2e.mjs', 'SECURITY.md']) {
+for (const path of [
+  'scripts/deployed-e2e.mjs',
+  'scripts/deployed-schema-check.mjs',
+  'SECURITY.md',
+]) {
   if (!existsSync(join(root, 'node_modules', 'sparql-d1', path))) {
     throw new Error(`Packed artifact is missing ${path}`);
   }

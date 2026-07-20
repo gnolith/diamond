@@ -11,6 +11,13 @@ must not be released. The repository now has bundled-Worker ASK/SELECT XML
 regressions and artifact-presence checks; an independent clean-room rerun of a
 new archive remains required before release.
 
+A second independent run of commit `4a0e008` and SHA-256
+`AAB0C9027B0F9F2BFD055D3C44AA2CF26509A647031AFE891F266F37E3045A4E`
+passed every production behavior check but failed sign-off because the packed
+procedure required managed-D1 catalog proof without providing a diagnostic
+route or command. The package now includes both; another independent run is
+required.
+
 ## Earlier private integration proof
 
 On 2026-07-19, package commit `34b790c` was installed from its packed artifact
@@ -76,3 +83,33 @@ The script sends both bearer headers, checks SPARQL Results XML in addition to
 the mutation/read/security sequence, generates a unique graph, and attempts
 cleanup in `finally`. Do not point it at a read-only or production-data
 endpoint.
+
+### Managed D1 catalog verification
+
+Temporarily mount the packed `examples/codex-site/app/api/sparql/schema/route.ts`
+and configure `SPARQL_ADMIN_TOKEN`. Then run the installed verifier with the
+schema endpoint and the same two authentication layers:
+
+```sh
+SPARQL_SCHEMA_ENDPOINT=https://example.test/api/sparql/schema \
+SPARQL_AUTH_HEADER=Authorization \
+SPARQL_AUTH_TOKEN=admin-token \
+SPARQL_OUTER_AUTH_HEADER=OAI-Sites-Authorization \
+SPARQL_OUTER_AUTH_TOKEN=sites-bypass-token \
+npm explore sparql-d1 -- npm run test:deployed:schema
+```
+
+PowerShell users can set the same values without POSIX inline assignment:
+
+```powershell
+$env:SPARQL_SCHEMA_ENDPOINT='https://example.test/api/sparql/schema'
+$env:SPARQL_AUTH_HEADER='Authorization'
+$env:SPARQL_AUTH_TOKEN='<admin token>'
+$env:SPARQL_OUTER_AUTH_HEADER='OAI-Sites-Authorization'
+$env:SPARQL_OUTER_AUTH_TOKEN='<Sites bypass token>'
+npm explore sparql-d1 -- npm run test:deployed:schema
+```
+
+The verifier fails unless the deployed catalog contains a STRICT `rdf_quads`
+table and all four expected covering indexes in exact column order. Remove the
+temporary schema route, admin route, and administrator token afterward.

@@ -23,5 +23,12 @@ the deployment requires an administrative endpoint. Never expose it without
 strong administrator authentication. Remote `LOAD` remains disabled on both
 routes; import trusted RDF through an application-controlled path.
 
+The optional `/api/sparql/schema` example is a narrow, read-only validation
+route protected by the same administrator token. It returns only the
+`rdf_quads` table definition and expected index layout through the package's
+`inspectStoreSchema` helper. Use the packed `npm run test:deployed:schema`
+command to verify managed D1, then remove this route with the writable route
+and administrator secret.
+
 The complete clean-project validation and sign-off checklist is in
 `docs/integration-validation.md` at the repository root.

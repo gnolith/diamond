@@ -35,3 +35,5 @@ Versioning after the first public release.
   a bundled-workerd regression test.
 - An artifact-contained deployed probe supporting separate outer Sites and
   endpoint bearer credentials.
+- A fail-closed managed-D1 schema validation route and packed verifier for the
+  STRICT table and exact covering-index catalog layout.

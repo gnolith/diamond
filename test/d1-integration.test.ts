@@ -4,7 +4,7 @@ import { DataFactory } from 'rdf-data-factory';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { D1QuadSource, insertQuads } from '../src/d1-source.js';
 import type { D1DatabaseLike } from '../src/d1-types.js';
-import { initializeStore } from '../src/schema.js';
+import { initializeStore, inspectStoreSchema } from '../src/schema.js';
 
 const factory = new DataFactory();
 
@@ -54,6 +54,13 @@ describe('workerd D1 integration', () => {
     expect(
       observations.every((metadata) => metadata?.rows_read !== undefined),
     ).toBe(true);
+  });
+
+  it('inspects the workerd D1 catalog for strictness and index order', async () => {
+    const inspection = await inspectStoreSchema(db);
+    expect(inspection.valid, inspection.errors.join('\n')).toBe(true);
+    expect(inspection.table.strict).toBe(true);
+    expect(Object.keys(inspection.indexes)).toHaveLength(4);
   });
 
   it('serializes concurrent duplicate writes without violating set semantics', async () => {

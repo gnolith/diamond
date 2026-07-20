@@ -40,6 +40,17 @@ describe('published integration assets', () => {
     expect(route).toContain('status: 503');
   });
 
+  it('keeps managed-schema inspection temporary and fail-closed', () => {
+    const route = readFileSync(
+      'examples/codex-site/app/api/sparql/schema/route.ts',
+      'utf8',
+    );
+    expect(route).toContain('inspectStoreSchema');
+    expect(route).toContain('SPARQL_ADMIN_TOKEN');
+    expect(route).toContain('status: 503');
+    expect(route).toContain("'cache-control': 'no-store'");
+  });
+
   it('includes the complete Sites example in the packed package', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
     expect(packageJson.files).toContain('examples');

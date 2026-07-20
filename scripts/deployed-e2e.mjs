@@ -64,6 +64,9 @@ async function assertStatus(response, expected) {
 }
 
 let inserted = false;
+let summary;
+let cleanupStatus;
+let cleanupVerified = false;
 
 try {
   const insert = await update(`
@@ -111,20 +114,29 @@ try {
   );
   await assertStatus(service, 403);
 
-  console.log(
-    JSON.stringify({
-      endpoint,
-      insertStatus: insert.status,
-      selectStatus: select.status,
-      xmlStatus: xml.status,
-      constructStatus: construct.status,
-      serviceStatus: service.status,
-      bindingCount: results.results.bindings.length,
-    }),
-  );
+  summary = {
+    endpoint,
+    insertStatus: insert.status,
+    selectStatus: select.status,
+    xmlStatus: xml.status,
+    constructStatus: construct.status,
+    serviceStatus: service.status,
+    bindingCount: results.results.bindings.length,
+  };
 } finally {
   if (inserted) {
     const cleanup = await update(`DROP SILENT GRAPH <${graph}>`);
     await assertStatus(cleanup, 204);
+    cleanupStatus = cleanup.status;
+    const verification = await request(
+      `ASK { GRAPH <${graph}> { ?s ?p ?o } }`,
+      'application/sparql-results+json',
+    );
+    await assertStatus(verification, 200);
+    const verificationResult = await verification.json();
+    assert.equal(verificationResult.boolean, false);
+    cleanupVerified = true;
   }
 }
+
+console.log(JSON.stringify({ ...summary, cleanupStatus, cleanupVerified }));

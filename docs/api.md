@@ -108,6 +108,10 @@ bound-value limit. Split larger imports at the application boundary.
 - `initializeStore(db)` applies the idempotent schema statements through
   transactional D1 `batch()`.
 - `schemaStatements` exposes those statements for migration tooling.
+- `inspectStoreSchema(db)` reads only the `rdf_quads` SQLite catalog entries
+  and reports table strictness, expected index column order, and validation
+  errors. It is intended for controlled deployment verification, not a public
+  application endpoint.
 - `encodeTerm(term)` and `decodeTerm(json)` provide the canonical lossless term
   representation used by the table.
 
