@@ -22,17 +22,20 @@ This repository remains private and intentionally uses version `0.0.0` with
   the repository becomes public.
 - GitHub vulnerability alerts and automated security fixes are enabled.
 - Repository text contains no local filesystem paths or private email
-  addresses.
+  addresses. Required public files, immutable Action references, local-path
+  hygiene, and release wiring are enforced by `npm run readiness:check`.
 - A packed artifact passed the query/update acceptance sequence in a private
   Codex Site against its real managed D1 binding.
+- GitHub-hosted CI and Security workflows pass on the current private main
+  branch, including Node 22 and 24, W3C conformance, benchmarks, audit,
+  Gitleaks, and CodeQL SARIF verification with zero findings.
 
 ## Release gates
 
 - [x] Pass the end-to-end query/update suite in a deployed Codex Site with a
       real managed D1 binding; evidence is in `docs/deployed-e2e.md`.
-- [ ] Resolve the GitHub-hosted runner `startup_failure` at the account or
-      billing-policy level, then require green CI and Security workflows. While
-      private code scanning is unavailable, CI retains CodeQL SARIF as an
+- [x] Require green GitHub-hosted CI and Security workflows. While private code
+      scanning publication is unavailable, CI retains CodeQL SARIF as an
       artifact and fails if it contains findings; publication switches on
       automatically when the repository becomes public.
 - [ ] Enable main-branch protection or a ruleset. GitHub currently returns 403

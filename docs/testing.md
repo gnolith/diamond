@@ -32,3 +32,6 @@ The dated deployed acceptance evidence and rerun command are recorded in
 `docs/deployed-e2e.md`.
 The reproducible multi-scenario baseline and interpretation are in
 `docs/performance.md`.
+The definition-of-done evidence map and semantic qualifications are in
+`docs/completion-audit.md`; open-source structure and release wiring are
+checked by `npm run readiness:check`.

@@ -44,7 +44,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run worker:check && npm run pack:check && npm run consumer:check && npm run licenses:check",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run worker:check && npm run pack:check && npm run consumer:check && npm run licenses:check && npm run readiness:check",
     "conformance": "npm run build && node scripts/run-conformance.mjs summary",
     "conformance:earl": "npm run build && node scripts/run-conformance.mjs earl",
     "consumer:check": "node scripts/consumer-smoke.mjs",
@@ -53,6 +53,7 @@
     "lint": "eslint .",
     "licenses:check": "license-checker-rseidelsohn --production --summary --onlyAllow \"MIT;ISC;BSD-2-Clause;Apache-2.0;BSD-3-Clause;BlueOak-1.0.0;FreeBSD;(WTFPL OR MIT);UNLICENSED\"",
     "prepack": "npm run build",
+    "readiness:check": "node scripts/readiness-check.mjs",
     "release:check": "node scripts/release-check.mjs",
     "test": "vitest run",
     "test:deployed": "node scripts/deployed-e2e.mjs",
