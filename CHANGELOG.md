@@ -5,6 +5,8 @@ Versioning after the first public release.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-07-21
+
 ### Changed
 
 - Clarified that Diamond owns published-package runtime verification while

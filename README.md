@@ -9,7 +9,7 @@ standards-based RDF query surface without operating a separate triplestore.
 > Status: public experimental release. SPARQL/RDF correctness is extensively
 > tested, while the TypeScript API and physical D1 schema may change before
 > 1.0. See the [npm package](https://www.npmjs.com/package/@gnolith/diamond)
-> and [v0.3.2 release](https://github.com/gnolith/diamond/releases/tag/v0.3.2).
+> and [v0.3.3 release](https://github.com/gnolith/diamond/releases/tag/v0.3.3).
 
 ## What it provides
 
