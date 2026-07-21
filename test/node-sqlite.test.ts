@@ -159,6 +159,77 @@ describe('NodeSqliteDatabase', () => {
     }
   });
 
+  it('copies binary bindings before queued execution', async () => {
+    const db = new NodeSqliteDatabase(':memory:');
+    try {
+      await db.prepare('CREATE TABLE blobs (value BLOB NOT NULL)').run();
+      const bytes = new Uint8Array([1, 2, 3]);
+      const first = db.prepare('INSERT INTO blobs VALUES (?)').bind(bytes);
+      bytes.fill(9);
+      await first.run();
+
+      const buffer = new ArrayBuffer(3);
+      const view = new Uint8Array(buffer);
+      view.set([4, 5, 6]);
+      const second = db.prepare('INSERT INTO blobs VALUES (?)').bind(buffer);
+      view.fill(8);
+      await second.run();
+
+      const dataViewBuffer = new ArrayBuffer(2);
+      const dataView = new DataView(dataViewBuffer);
+      dataView.setUint8(0, 7);
+      dataView.setUint8(1, 8);
+      const third = db.prepare('INSERT INTO blobs VALUES (?)').bind(dataView);
+      dataView.setUint8(0, 0);
+      dataView.setUint8(1, 0);
+      await third.run();
+
+      const result = await db
+        .prepare('SELECT hex(value) AS value FROM blobs ORDER BY rowid')
+        .all<{ value: string }>();
+      expect(result.results).toEqual([
+        { value: '010203' },
+        { value: '040506' },
+        { value: '0708' },
+      ]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('returns rows and normalized changes for ordered DML RETURNING', async () => {
+    const db = new NodeSqliteDatabase(':memory:');
+    try {
+      await db
+        .prepare(
+          'CREATE TABLE returning_probe (id INTEGER PRIMARY KEY, value TEXT)',
+        )
+        .run();
+      const results = await db.batch<{ id: number; value: string }>([
+        db
+          .prepare(
+            'INSERT INTO returning_probe (id, value) VALUES (1, ?) RETURNING id, value',
+          )
+          .bind('inserted'),
+        db
+          .prepare(
+            'UPDATE returning_probe SET value = ? WHERE id = 1 RETURNING id, value',
+          )
+          .bind('updated'),
+        db.prepare(
+          'DELETE FROM returning_probe WHERE id = 1 RETURNING id, value',
+        ),
+      ]);
+      expect(results).toMatchObject([
+        { results: [{ id: 1, value: 'inserted' }], meta: { changes: 1 } },
+        { results: [{ id: 1, value: 'updated' }], meta: { changes: 1 } },
+        { results: [{ id: 1, value: 'updated' }], meta: { changes: 1 } },
+      ]);
+    } finally {
+      await db.close();
+    }
+  });
+
   it('rejects cross-connection statements and use after close', async () => {
     const first = new NodeSqliteDatabase(':memory:');
     const second = new NodeSqliteDatabase(':memory:');

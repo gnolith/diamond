@@ -124,6 +124,29 @@ for (const adapter of adapters) {
       }
     });
 
+    it('fails closed on a pre-ledger trigger with an unrelated name', async () => {
+      const db = await adapter.create();
+      try {
+        await db.batch(schemaStatements.map((sql) => db.prepare(sql)));
+        await db.prepare('CREATE TABLE unrelated (value INTEGER)').run();
+        await db
+          .prepare(
+            `CREATE TRIGGER innocuous_name AFTER INSERT ON unrelated BEGIN
+               DELETE FROM rdf_quads WHERE id = NEW.value;
+             END`,
+          )
+          .run();
+        await expect(initializeStore(db)).rejects.toThrow(
+          /innocuous_name|partial|ambiguous/u,
+        );
+        expect(
+          await readAppliedMigrations(db, diamondMigrationNamespace),
+        ).toEqual([]);
+      } finally {
+        await db.close();
+      }
+    });
+
     it('rejects checksum drift and unknown newer migration IDs', async () => {
       const drifted = await adapter.create();
       try {
@@ -233,6 +256,27 @@ for (const adapter of adapters) {
         );
       } finally {
         await malformed.close();
+      }
+
+      const nonStrict = await adapter.create();
+      try {
+        await nonStrict
+          .prepare(
+            `CREATE TABLE ${migrationLedgerTable} (
+              namespace TEXT NOT NULL,
+              migration_id TEXT NOT NULL,
+              checksum TEXT NOT NULL,
+              adopted INTEGER NOT NULL DEFAULT 0 CHECK (adopted IN (0, 1)),
+              applied_at TEXT NOT NULL,
+              PRIMARY KEY (namespace, migration_id)
+            )`,
+          )
+          .run();
+        await expect(ensureMigrationLedger(nonStrict)).rejects.toThrow(
+          /exact STRICT/u,
+        );
+      } finally {
+        await nonStrict.close();
       }
 
       const db = await adapter.create();

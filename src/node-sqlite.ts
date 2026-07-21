@@ -9,9 +9,7 @@ import type {
   SqlitePreparedStatementLike,
   SqliteResultLike,
 } from './d1-types.js';
-
-// StatementSync.columns() was backported to the Node 22 line in 22.16.0.
-const MINIMUM_NODE_VERSION = [22, 16, 0] as const;
+import { assertSupportedNodeSqliteVersion } from './node-version.js';
 
 export interface NodeSqliteDatabaseOptions {
   /** How long SQLite waits for a conflicting file lock. Defaults to 5 seconds. */
@@ -36,38 +34,49 @@ class ConnectionMutex {
   }
 }
 
+type ConnectionOperation = <T>(
+  operation: (connection: DatabaseSync) => T,
+) => Promise<T>;
+
 class NodeSqliteStatement
   implements SqlitePreparedStatementLike, SqliteFirstCapability
 {
-  readonly owner: NodeSqliteDatabase;
-  readonly sql: string;
-  readonly values: readonly SQLInputValue[];
+  readonly #owner: object;
+  readonly #sql: string;
+  readonly #values: readonly SQLInputValue[];
+  readonly #withConnection: ConnectionOperation;
 
   constructor(
-    owner: NodeSqliteDatabase,
+    owner: object,
     sql: string,
+    withConnection: ConnectionOperation,
     values: readonly SQLInputValue[] = [],
   ) {
-    this.owner = owner;
-    this.sql = sql;
-    this.values = values;
+    this.#owner = owner;
+    this.#sql = sql;
+    this.#withConnection = withConnection;
+    this.#values = values;
   }
 
   bind(...values: unknown[]): NodeSqliteStatement {
-    this.owner.assertOpen();
     return new NodeSqliteStatement(
-      this.owner,
-      this.sql,
+      this.#owner,
+      this.#sql,
+      this.#withConnection,
       values.map(normalizeInput),
     );
   }
 
   async run<T = Record<string, unknown>>(): Promise<SqliteResultLike<T>> {
-    return this.owner.execute(() => this.executeRun<T>());
+    return this.#withConnection((connection) =>
+      this.#executeRun<T>(connection),
+    );
   }
 
   async all<T = Record<string, unknown>>(): Promise<SqliteResultLike<T>> {
-    return this.owner.execute(() => this.executeAll<T>());
+    return this.#withConnection((connection) =>
+      this.#executeAll<T>(connection),
+    );
   }
 
   async first<T = Record<string, unknown>>(): Promise<T | null> {
@@ -75,28 +84,27 @@ class NodeSqliteStatement
     return result.results[0] ?? null;
   }
 
-  executeBatch<T>(): SqliteResultLike<T> {
-    const statement = this.prepare();
+  belongsTo(owner: object): boolean {
+    return this.#owner === owner;
+  }
+
+  executeBatch<T>(connection: DatabaseSync): SqliteResultLike<T> {
+    const statement = connection.prepare(this.#sql);
     return statement.columns().length > 0
-      ? this.resultForRows<T>(statement)
-      : this.resultForChanges<T>(statement);
+      ? this.#resultForRows<T>(connection, statement)
+      : this.#resultForChanges<T>(statement);
   }
 
-  private executeRun<T>(): SqliteResultLike<T> {
-    return this.resultForChanges<T>(this.prepare());
+  #executeRun<T>(connection: DatabaseSync): SqliteResultLike<T> {
+    return this.#resultForChanges<T>(connection.prepare(this.#sql));
   }
 
-  private executeAll<T>(): SqliteResultLike<T> {
-    return this.resultForRows<T>(this.prepare());
+  #executeAll<T>(connection: DatabaseSync): SqliteResultLike<T> {
+    return this.#resultForRows<T>(connection, connection.prepare(this.#sql));
   }
 
-  private prepare(): StatementSync {
-    this.owner.assertOpen();
-    return this.owner.connection.prepare(this.sql);
-  }
-
-  private resultForChanges<T>(statement: StatementSync): SqliteResultLike<T> {
-    const result = statement.run(...this.values);
+  #resultForChanges<T>(statement: StatementSync): SqliteResultLike<T> {
+    const result = statement.run(...this.#values);
     return {
       results: [],
       success: true,
@@ -107,12 +115,17 @@ class NodeSqliteStatement
     };
   }
 
-  private resultForRows<T>(statement: StatementSync): SqliteResultLike<T> {
-    const results = statement.all(...this.values) as T[];
+  #resultForRows<T>(
+    connection: DatabaseSync,
+    statement: StatementSync,
+  ): SqliteResultLike<T> {
+    const before = readTotalChanges(connection);
+    const results = statement.all(...this.#values) as T[];
+    const changes = readTotalChanges(connection) - before;
     return {
       results,
       success: true,
-      meta: { changes: 0, rows_read: results.length },
+      meta: { changes, rows_read: results.length },
     };
   }
 }
@@ -122,12 +135,13 @@ class NodeSqliteStatement
  * Operations are exposed asynchronously and serialized per connection.
  */
 export class NodeSqliteDatabase implements SqliteDatabaseLike {
-  readonly connection: DatabaseSync;
+  readonly #connection: DatabaseSync;
   readonly #mutex = new ConnectionMutex();
+  readonly #owner = {};
   #closed = false;
 
   constructor(path: string, options: NodeSqliteDatabaseOptions = {}) {
-    assertSupportedNodeVersion();
+    assertSupportedNodeSqliteVersion(process.versions.node);
     if (!path) {
       throw new TypeError('A SQLite file path or :memory: is required');
     }
@@ -136,39 +150,43 @@ export class NodeSqliteDatabase implements SqliteDatabaseLike {
       throw new RangeError('busyTimeoutMs must be a non-negative safe integer');
     }
 
-    this.connection = new DatabaseSync(path);
+    this.#connection = new DatabaseSync(path);
     try {
-      this.connection.exec('PRAGMA foreign_keys = ON');
-      this.connection.exec(`PRAGMA busy_timeout = ${busyTimeoutMs}`);
+      this.#connection.exec('PRAGMA foreign_keys = ON');
+      this.#connection.exec(`PRAGMA busy_timeout = ${busyTimeoutMs}`);
       if (path !== ':memory:') {
-        this.connection.exec('PRAGMA journal_mode = WAL');
+        this.#connection.exec('PRAGMA journal_mode = WAL');
       }
     } catch (cause) {
-      this.connection.close();
+      this.#connection.close();
       this.#closed = true;
       throw cause;
     }
   }
 
-  prepare(sql: string): NodeSqliteStatement {
-    this.assertOpen();
+  prepare(sql: string): SqlitePreparedStatementLike & SqliteFirstCapability {
+    this.#assertOpen();
     if (!sql.trim()) {
       throw new TypeError('Prepared SQL must not be empty');
     }
-    return new NodeSqliteStatement(this, sql);
+    return new NodeSqliteStatement(
+      this.#owner,
+      sql,
+      this.#withConnection.bind(this),
+    );
   }
 
   async batch<T = Record<string, unknown>>(
     statements: SqlitePreparedStatementLike[],
   ): Promise<Array<SqliteResultLike<T>>> {
-    return this.execute(() => {
+    return this.#withConnection((connection) => {
       const owned = statements.map((statement) => {
         if (!(statement instanceof NodeSqliteStatement)) {
           throw new TypeError(
             'NodeSqliteDatabase.batch received an incompatible statement',
           );
         }
-        if (statement.owner !== this) {
+        if (!statement.belongsTo(this.#owner)) {
           throw new TypeError(
             'NodeSqliteDatabase.batch received a statement from another connection',
           );
@@ -176,14 +194,16 @@ export class NodeSqliteDatabase implements SqliteDatabaseLike {
         return statement;
       });
 
-      this.connection.exec('BEGIN IMMEDIATE');
+      connection.exec('BEGIN IMMEDIATE');
       try {
-        const results = owned.map((statement) => statement.executeBatch<T>());
-        this.connection.exec('COMMIT');
+        const results = owned.map((statement) =>
+          statement.executeBatch<T>(connection),
+        );
+        connection.exec('COMMIT');
         return results;
       } catch (cause) {
         try {
-          this.connection.exec('ROLLBACK');
+          connection.exec('ROLLBACK');
         } catch {
           // Preserve the statement/commit failure that caused the rollback.
         }
@@ -195,7 +215,7 @@ export class NodeSqliteDatabase implements SqliteDatabaseLike {
   async close(): Promise<void> {
     await this.#mutex.run(() => {
       if (!this.#closed) {
-        this.connection.close();
+        this.#connection.close();
         this.#closed = true;
       }
     });
@@ -205,17 +225,19 @@ export class NodeSqliteDatabase implements SqliteDatabaseLike {
     await this.close();
   }
 
-  assertOpen(): void {
-    if (this.#closed || !this.connection.isOpen) {
-      throw new Error('NodeSqliteDatabase is closed');
-    }
+  async #withConnection<T>(
+    operation: (connection: DatabaseSync) => T,
+  ): Promise<T> {
+    return this.#mutex.run(() => {
+      this.#assertOpen();
+      return operation(this.#connection);
+    });
   }
 
-  async execute<T>(operation: () => T): Promise<T> {
-    return this.#mutex.run(() => {
-      this.assertOpen();
-      return operation();
-    });
+  #assertOpen(): void {
+    if (this.#closed || !this.#connection.isOpen) {
+      throw new Error('NodeSqliteDatabase is closed');
+    }
   }
 }
 
@@ -224,8 +246,7 @@ function normalizeInput(value: unknown): SQLInputValue {
     value === null ||
     typeof value === 'string' ||
     typeof value === 'number' ||
-    typeof value === 'bigint' ||
-    value instanceof Uint8Array
+    typeof value === 'bigint'
   ) {
     return value;
   }
@@ -233,23 +254,21 @@ function normalizeInput(value: unknown): SQLInputValue {
     return value ? 1 : 0;
   }
   if (value instanceof ArrayBuffer) {
-    return new Uint8Array(value);
+    return new Uint8Array(value.slice(0));
+  }
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(
+      value.buffer,
+      value.byteOffset,
+      value.byteLength,
+    ).slice();
   }
   throw new TypeError(`Unsupported SQLite binding value: ${typeof value}`);
 }
 
-function assertSupportedNodeVersion(): void {
-  const actual = process.versions.node.split('.').map(Number);
-  for (let index = 0; index < MINIMUM_NODE_VERSION.length; index += 1) {
-    const component = actual[index] ?? 0;
-    const minimum = MINIMUM_NODE_VERSION[index]!;
-    if (component > minimum) {
-      return;
-    }
-    if (component < minimum) {
-      throw new Error(
-        `@gnolith/diamond/node-sqlite requires Node.js ${MINIMUM_NODE_VERSION.join('.')} or newer`,
-      );
-    }
-  }
+function readTotalChanges(connection: DatabaseSync): number {
+  const row = connection.prepare('SELECT total_changes() AS changes').get() as {
+    changes: number | bigint;
+  };
+  return Number(row.changes);
 }

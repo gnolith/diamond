@@ -189,6 +189,7 @@ host. `SqliteFirstCapability` is optional and is not required by the shared
 contract. `SqliteQuadSource` and `SqliteQuadStore` are neutral aliases for the
 existing runtime classes.
 
-`@gnolith/diamond/node-sqlite` exports `NodeSqliteDatabase` for Node.js 22.16.0
-or newer. See [embedded SQLite and migrations](embedded-sqlite.md) for file,
+`@gnolith/diamond/node-sqlite` exports `NodeSqliteDatabase` for Node.js 22.16+
+on the Node 22 line, 23.11+ on the Node 23 line, and Node 24+. See
+[embedded SQLite and migrations](embedded-sqlite.md) for file,
 memory, durability, concurrency, busy-timeout, and close semantics.

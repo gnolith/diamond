@@ -90,6 +90,19 @@ interface TableInfoRow {
   pk: number;
 }
 
+interface SchemaObjectRow {
+  type: string;
+  name: string;
+  tbl_name: string;
+  sql: string | null;
+}
+
+const diamondTableNames = new Set(['rdf_quads', 'rdf_patch_guards']);
+const allowedDiamondIndexes = new Set([
+  ...Object.keys(expectedStoreIndexes),
+  'sqlite_autoindex_rdf_patch_guards_1',
+]);
+
 export interface StoreSchemaInspection {
   table: {
     name: 'rdf_quads';
@@ -123,14 +136,8 @@ export async function migrateDiamondStore(db: D1DatabaseLike): Promise<void> {
     return;
   }
 
-  const existing = await db
-    .prepare(
-      `SELECT type, name FROM sqlite_schema
-       WHERE name LIKE 'rdf\\_%' ESCAPE '\\'
-       ORDER BY type, name`,
-    )
-    .all<{ type: string; name: string }>();
-  if (existing.results.length === 0) {
+  const associatedObjects = await readAssociatedSchemaObjects(db);
+  if (associatedObjects.length === 0) {
     await applyNamespacedMigrations(
       db,
       diamondMigrationNamespace,
@@ -140,25 +147,9 @@ export async function migrateDiamondStore(db: D1DatabaseLike): Promise<void> {
   }
 
   const inspection = await inspectStoreSchema(db);
-  const expectedNames = new Set([
-    'rdf_quads',
-    'rdf_patch_guards',
-    'rdf_quads_pogs_idx',
-    'rdf_quads_ogsp_idx',
-    'rdf_quads_gspo_idx',
-  ]);
-  const unexpected = existing.results.filter(
-    ({ name }) => !expectedNames.has(name),
-  );
-  if (!inspection.valid || unexpected.length > 0) {
-    const details = [
-      ...inspection.errors,
-      ...unexpected.map(
-        ({ type, name }) => `unexpected Diamond-like ${type} ${name}`,
-      ),
-    ];
+  if (!inspection.valid) {
     throw new MigrationStateError(
-      `Existing Diamond schema is partial or ambiguous and was not modified: ${details.join('; ')}`,
+      `Existing Diamond schema is partial or ambiguous and was not modified: ${inspection.errors.join('; ')}`,
     );
   }
   await recordMigrationAdoption(
@@ -212,6 +203,22 @@ export async function inspectStoreSchema(
   }
   if (guardTableSql) {
     await inspectColumns(db, 'rdf_patch_guards', expectedGuardColumns, errors);
+  }
+
+  const associatedObjects = await readAssociatedSchemaObjects(db);
+  for (const object of associatedObjects) {
+    if (object.type === 'table' && !diamondTableNames.has(object.name)) {
+      errors.push(`unexpected Diamond-like table ${object.name}`);
+    } else if (
+      object.type === 'index' &&
+      !allowedDiamondIndexes.has(object.name)
+    ) {
+      errors.push(`unexpected index ${object.name} affects ${object.tbl_name}`);
+    } else if (object.type === 'trigger') {
+      errors.push(`unexpected trigger ${object.name} affects Diamond storage`);
+    } else if (object.type === 'view') {
+      errors.push(`unexpected view ${object.name} targets Diamond storage`);
+    }
   }
 
   for (const [indexName, expectedColumns] of Object.entries(
@@ -268,4 +275,41 @@ async function inspectColumns(
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     errors.push(`${table} has an unexpected column definition`);
   }
+}
+
+async function readAssociatedSchemaObjects(
+  db: D1DatabaseLike,
+): Promise<SchemaObjectRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT type, name, tbl_name, sql
+       FROM sqlite_schema
+       WHERE type IN ('table', 'index', 'trigger', 'view')
+       ORDER BY type, name`,
+    )
+    .all<SchemaObjectRow>();
+  return result.results.filter(isDiamondAssociatedObject);
+}
+
+function isDiamondAssociatedObject(object: SchemaObjectRow): boolean {
+  if (object.name.startsWith('rdf_')) {
+    return true;
+  }
+  if (
+    (object.type === 'index' || object.type === 'trigger') &&
+    diamondTableNames.has(object.tbl_name)
+  ) {
+    return true;
+  }
+  if (object.type === 'trigger' || object.type === 'view') {
+    return referencesDiamondTable(object.sql);
+  }
+  return false;
+}
+
+function referencesDiamondTable(sql: string | null): boolean {
+  return (
+    sql !== null &&
+    /(?:^|[^a-z0-9_])rdf_(?:quads|patch_guards)(?:$|[^a-z0-9_])/iu.test(sql)
+  );
 }

@@ -48,6 +48,10 @@ interface LedgerColumn {
   pk: number;
 }
 
+interface SchemaSqlRow {
+  sql: string | null;
+}
+
 interface LedgerRow {
   namespace: string;
   migration_id: string;
@@ -72,6 +76,28 @@ export async function ensureMigrationLedger(
   if (JSON.stringify(actual) !== JSON.stringify(expectedLedgerColumns)) {
     throw new MigrationStateError(
       `${migrationLedgerTable} has an unsupported schema; expected the Gnolith migration ledger exactly`,
+    );
+  }
+  const schema = await db
+    .prepare(
+      `SELECT sql FROM sqlite_schema
+       WHERE type = 'table' AND name = ?`,
+    )
+    .bind(migrationLedgerTable)
+    .all<SchemaSqlRow>();
+  const actualSql = schema.results[0]?.sql;
+  const expectedSql = createLedgerStatement.replace(
+    'CREATE TABLE IF NOT EXISTS',
+    'CREATE TABLE',
+  );
+  if (
+    !actualSql ||
+    (normalizeSchemaSql(actualSql) !==
+      normalizeSchemaSql(createLedgerStatement) &&
+      normalizeSchemaSql(actualSql) !== normalizeSchemaSql(expectedSql))
+  ) {
+    throw new MigrationStateError(
+      `${migrationLedgerTable} must be the exact STRICT Gnolith ledger, including its primary key, default, and CHECK constraint`,
     );
   }
 }
@@ -278,4 +304,8 @@ function assertNamespace(namespace: string): void {
       'Migration namespace must be a non-empty string of at most 200 characters',
     );
   }
+}
+
+function normalizeSchemaSql(sql: string): string {
+  return sql.replace(/\s+/gu, ' ').trim().toLowerCase();
 }

@@ -88,6 +88,15 @@ execFileSync(process.execPath, [join(root, 'smoke.mjs')], {
 const installed = JSON.parse(
   readFileSync(join(root, 'node_modules', packagePath, 'package.json'), 'utf8'),
 );
+const nodeAdapterTypes = readFileSync(
+  join(root, 'node_modules', packagePath, 'dist', 'node-sqlite.d.ts'),
+  'utf8',
+);
+assert.doesNotMatch(
+  nodeAdapterTypes,
+  /readonly connection|\bexecute</u,
+  'Node adapter declarations expose connection or mutex-bypass internals',
+);
 if (
   installed.private !== sourcePackage.private ||
   installed.version !== sourcePackage.version

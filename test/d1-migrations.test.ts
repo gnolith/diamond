@@ -19,7 +19,16 @@ describe('workerd D1 migration conformance', () => {
   const databases = new Map<string, D1DatabaseLike>();
 
   beforeAll(async () => {
-    const names = ['fresh', 'legacy', 'partial', 'history', 'failure', 'race'];
+    const names = [
+      'fresh',
+      'legacy',
+      'partial',
+      'adversarial',
+      'ledger',
+      'history',
+      'failure',
+      'race',
+    ];
     miniflare = new Miniflare({
       modules: true,
       script: 'export default { fetch() { return new Response("ok") } }',
@@ -77,6 +86,39 @@ describe('workerd D1 migration conformance', () => {
     expect(await readAppliedMigrations(db, diamondMigrationNamespace)).toEqual(
       [],
     );
+  });
+
+  it('rejects unrelated-name D1 trigger targeting Diamond during adoption', async () => {
+    const db = databases.get('adversarial')!;
+    await db.batch(schemaStatements.map((sql) => db.prepare(sql)));
+    await db.prepare('CREATE TABLE unrelated (value INTEGER)').run();
+    await db
+      .prepare(
+        `CREATE TRIGGER innocuous_name AFTER INSERT ON unrelated BEGIN
+           DELETE FROM rdf_quads WHERE id = NEW.value;
+         END`,
+      )
+      .run();
+    await expect(initializeStore(db)).rejects.toThrow(
+      /innocuous_name|partial|ambiguous/u,
+    );
+  });
+
+  it('rejects a matching but non-STRICT D1 ledger', async () => {
+    const db = databases.get('ledger')!;
+    await db
+      .prepare(
+        `CREATE TABLE ${migrationLedgerTable} (
+          namespace TEXT NOT NULL,
+          migration_id TEXT NOT NULL,
+          checksum TEXT NOT NULL,
+          adopted INTEGER NOT NULL DEFAULT 0 CHECK (adopted IN (0, 1)),
+          applied_at TEXT NOT NULL,
+          PRIMARY KEY (namespace, migration_id)
+        )`,
+      )
+      .run();
+    await expect(ensureMigrationLedger(db)).rejects.toThrow(/exact STRICT/u);
   });
 
   it('rejects drift and unknown D1 history', async () => {

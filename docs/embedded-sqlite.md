@@ -11,8 +11,9 @@ separately implement `SqliteFirstCapability`.
 
 `@gnolith/diamond/node-sqlite` exports `NodeSqliteDatabase`, an embedded,
 process-local adapter built on `node:sqlite`. It is not a database server or a
-remote protocol. The subpath requires Node.js 22.16.0 or newer and is isolated
-from Diamond's root and Worker entry points.
+remote protocol. The subpath supports Node.js 22.16 or newer on the Node 22
+line, Node 23.11 or newer on the Node 23 line, and Node 24 or newer. It is
+isolated from Diamond's root and Worker entry points.
 
 ```ts
 import { initializeStore } from '@gnolith/diamond';
@@ -42,7 +43,9 @@ coordination.
 
 The `_gnolith_migrations` STRICT table records a package namespace, stable
 migration ID, SHA-256 content checksum, adoption marker, and application time.
-`applyNamespacedMigrations()` owns only the supplied namespace. It rejects
+`applyNamespacedMigrations()` owns only the supplied namespace. The ledger must
+match Diamond's exact STRICT schema, including its primary key, default, and
+CHECK constraint. The migrator rejects
 unknown/newer IDs, gaps, reordered history, checksum drift, and an incompatible
 ledger schema. Migration statements and their successful ledger insert share
 one adapter batch.
@@ -57,7 +60,9 @@ with the RDF store.
 `initializeStore()` remains the compatible Diamond entry point. On an empty
 database it creates the ledger and current RDF schema. On an exact pre-ledger
 Diamond store it records an adopted baseline without replaying DDL or rewriting
-quads. Partial, ambiguous, unexpected, or drifted Diamond states are rejected
+quads. Exact adoption also rejects every unexpected index, trigger, or view
+that targets or references Diamond tables, regardless of the object's name.
+Partial, ambiguous, unexpected, or drifted Diamond states are rejected
 with `MigrationStateError` rather than repaired destructively.
 
 D1 and the Node adapter both promise atomic ordered batches. A concurrent
