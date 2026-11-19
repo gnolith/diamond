@@ -1,5 +1,7 @@
 # @gnolith/diamond
 
+> **Retired.** Active use of this repository has ended.
+
 Diamond is a transport-neutral SPARQL executor and atomic RDF/JS store for
 Cloudflare D1-compatible and embedded SQLite connections.
 
